@@ -1,0 +1,57 @@
+# Build script for GLib2
+
+before_script:
+  - export CFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+  - export CPPFLAGS="-D_FORTIFY_SOURCE=2"
+  - export CXXFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+  - export FCFLAGS="-g -O2 -fstack-protector-strong"
+  - export FFLAGS="-g -O2 -fstack-protector-strong"
+  - export GCJFLAGS="-g -O2 -fstack-protector-strong"
+  - export LDFLAGS="-Wl,-z,relro"
+  - export OBJCFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+  - export OBJCXXFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+  #- sudo apt-get build-dep libjpeg-turbo
+  - rm -rf ./lipkg/target
+  - find $BUILDROOT/lipkg/ -name "*.ipk*" -exec rm {} \;
+
+script:
+  - ./configure --prefix=/app
+                --enable-gtk-doc
+                --enable-static
+                --enable-installed-tests
+                --enable-always-build-tests
+                --enable-debug=minimum
+  - make -j4
+  - make install DESTDIR=$BUILDROOT/lipkg/tmp.target/
+  - cd $BUILDROOT/lipkg
+  - TARGET_TMP="./tmp.target/app"
+  # remove static library stuff
+  - find $TARGET_TMP -name "*.la" -exec rm {} \;
+  - find $TARGET_TMP -name "*.a" -exec rm {} \;
+  # Move files to the right place
+  - mkdir -p rt.target/bin
+  - mkdir -p sdk.target/bin
+  - mkdir -p rt.target/share
+  - mkdir -p sdk.target/share
+  # SDK
+  - mv $TARGET_TMP/include sdk.target/
+  - mv $TARGET_TMP/bin/* sdk.target/bin/
+  - mv sdk.target/bin/gdbus
+        sdk.target/bin/gio-querymodules
+        sdk.target/bin/gsettings
+        rt.target/bin/
+  - mv $TARGET_TMP/libexec sdk.target/
+  - mv $TARGET_TMP/share/glib-2.0
+        $TARGET_TMP/share/gdb
+        $TARGET_TMP/share/aclocal
+        $TARGET_TMP/share/gtk-doc
+        ./sdk.target/share/
+  # RT
+  - mv $TARGET_TMP/lib rt.target/
+  - mv $TARGET_TMP/share/locale rt.target/share
+  # build package
+  - cd $BUILDROOT
+  - lipkgen build lipkg/ --no-signature
+
+after_script:
+  - make clean distclean
